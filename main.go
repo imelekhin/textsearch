@@ -7,29 +7,20 @@ import (
 	"regexp"
 )
 
-type fieldsHashTable map[string]*regexListEntryPoint
+type fieldsHashTable map[string]searchList
 
-type regexListEntryPoint struct {
-	next *regexListEntryPoint
-	r    regexp.Regexp
-	msg  string
+type searchList struct {
+	regexps  []regexp.Regexp
+	comments []string
 }
 
-type configEntry struct {
-	SearchField string
-	FilePath    string
-	Msg         string
-}
+var fields fieldsHashTable
 
-func parseConfigString(cs string) configEntry {
-	var ce configEntry
-	return ce
-}
+var logger *log.Logger
 
-func loadSearches(filename string) (*fieldsHashTable, error) {
+func loadSearches(filename string) []regexp.Regexp {
 
-	var ce configEntry
-	res := make(fieldsHashTable, 0)
+	res := make([]regexp.Regexp, 0)
 
 	file, err := os.Open(filename)
 
@@ -44,10 +35,25 @@ func loadSearches(filename string) (*fieldsHashTable, error) {
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
 	}
-
+	line := 0
 	for scanner.Scan() {
-		ce = parseConfigString(scanner.Text())
+		str, err := regexp.Compile(scanner.Text())
+		if err != nil {
+			logger.Printf("Error compiling regexp in line %d", line)
+			line++
+			break
+		}
+		res = append(res, *str)
+		line++
 
 	}
+
+}
+
+func init() {
+	logger = log.New(os.Stdout, "ipsearch: ", log.Ldate|log.Ltime|log.Lshortfile)
+	comments = make([]string, 1)
+	comments[0] = "Bad regexp found"
+	fields = make(fieldsHashTable, 0)
 
 }
