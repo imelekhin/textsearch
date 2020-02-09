@@ -1,4 +1,22 @@
-'SrcIP' : './url.list' #Bad URL from Kasper found
+# this is comment
+
+    f:'test':Error
+
+
+[message]
+    f:'./url.list':Bad URL from Kasper found
+    r   :    'мама мыла раму':Found test Virus
+    r   :  'sssssssss':dcsdcscdsd
+    r   :    'мама мыла раму':Found test Virus
+    r  : 'asaasasas' :asasassas
+
+# This is another comment    
+[action]
+    r:'accept':Accept from
+
+[         ]
+[]
+
 
 
 
