@@ -64,12 +64,12 @@ func (s *stat_writer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func getKafkaReader(kafkaURL, topic, groupID string, logger *log.Logger) *kafka.Reader {
 	brokers := strings.Split(kafkaURL, ",")
 	return kafka.NewReader(kafka.ReaderConfig{
-		Brokers:        brokers,
-		GroupID:        groupID,
-		Topic:          topic,
-		MinBytes:       10e3, // 10KB
-		MaxBytes:       10e6, // 10MB
-		StartOffset:    kafka.LastOffset,
+		Brokers:  brokers,
+		GroupID:  groupID,
+		Topic:    topic,
+		MinBytes: 10e3, // 10KB
+		MaxBytes: 10e6, // 10MB
+		//StartOffset:    kafka.LastOffset,
 		CommitInterval: 1 * time.Second,
 		QueueCapacity:  10000,
 		//ReadBackoffMin: 1 * time.Millisecond,
@@ -266,8 +266,40 @@ func loadSearches(filename string) {
 
 }
 
+type kafkaMsg struct {
+	SrcIp       string `json:"scip"`
+	Message     string `json:"message"`
+	Summary     string `json:"summary"`
+	Description string `json:"desc"`
+	Timestamp   string `json:"@timestamp"`
+	Type        string `json:"type"`
+}
+
 func sendAlarm(message map[string]interface{}, regexp string, comment string) {
-	logger.Print("In message: ", message["message"], " found regexp :", regexp, " ", comment)
+	logger.Print("In message: ", message, " found regexp :", regexp, " ", comment)
+
+	msg := new(kafkaMsg)
+
+	msg.Message = message["message"].(string)
+	msg.Type = message["type"].(string)
+	msg.SrcIp = message["srcip"].(string)
+	msg.Summary = comment
+	msg.Description = "Found regexp '" + regexp + "'"
+	msg.Timestamp = time.Now().Format(time.RFC3339)
+
+	alrm, _ := json.Marshal(&msg)
+
+	str := kafka.Message{
+		Key:   []byte("ti"), //[]byte(alert.BadIP)
+		Value: alrm,
+	}
+
+	err := writer.WriteMessages(context.Background(), str)
+
+	if err != nil {
+		logger.Print(err)
+	}
+
 }
 
 func init() {
