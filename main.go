@@ -52,7 +52,8 @@ type kafkaMsg struct {
 	Summary     string `json:"summary"`
 	Description string `json:"desc"`
 	Timestamp   string `json:"@timestamp"`
-	Type        string `json:"type"`
+	CustomerID        string `json:"type"`
+	OrganizationCode string `json:"code"`
 }
 
 var (
@@ -292,7 +293,7 @@ func sendAlarm(message map[string]interface{}, regexp string, findings string, c
 
 	msg := new(kafkaMsg)
 	msg.Message = message["message"].(string)
-	msg.Type = message["type"].(string)
+	msg.CustomerID = message["type"].(string)
 	msg.SrcIP = message["srcip"].(string)
 	msg.Summary = comment
 	msg.Description = "Found string " + findings + "with regexp '" + regexp + "'"
