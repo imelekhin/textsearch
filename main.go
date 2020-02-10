@@ -343,12 +343,12 @@ func main() {
 	reader = getKafkaReader(*kafkaURL, *intopic, *groupID, logger)
 	writer = newKafkaWriter(*kafkaURL, *outtopic)
 
-	quit := make(chan struct{})
+	
 
 	defer func() {
 		reader.Close()
 		writer.Close()
-		close(quit)
+		close(sigs)
 	}()
 
 	go func() {
