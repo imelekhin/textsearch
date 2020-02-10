@@ -1,8 +1,8 @@
-/*
-	Search for regexp patterns in Kafka stream. Kafka messages must be in JSON.
-	If regexp found write alarm to Kafka topic.
-*/
 package main
+
+/*  Search for regexp patterns in Kafka stream. Kafka messages must be in JSON.
+If regexp found write alarm to Kafka topic.
+*/
 
 import (
 	"bufio"
