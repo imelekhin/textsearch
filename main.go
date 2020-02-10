@@ -1,3 +1,7 @@
+/*
+	Search for regexp patterns in Kafka stream. Kafka messages must be in JSON.
+	If regexp found write alarm to Kafka topic.
+*/
 package main
 
 import (
@@ -18,7 +22,14 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
+/*
+ Main hash map to store mapings from Kafka message field to array of regexp to search in that field
+*/
 type fieldsHashTable map[string]*searchList
+
+/*
+searchList stores compiled regexp, comments and index from regexp to comment. Multiply regexps can has single comment
+*/
 
 type searchList struct {
 	regexps    []regexp.Regexp
@@ -26,41 +37,54 @@ type searchList struct {
 	comments   []string
 }
 
-var kafkaURL = flag.String("kafka-broker", "127.0.0.1:9092", "Kafka broker URL list")
-var intopic = flag.String("kafka-in-topic", "notopic", "Kafka topic to read from")
-var outtopic = flag.String("kafka-out-topic", "notopic", "Kafka topic to write to")
-var groupID = flag.String("kafka-group", "nogroup", "Kafka group")
-var metricsport = flag.String("metric-port", "1234", "Port to expose metrics")
+/*
+  structs for expose Kafka metrics
+*/
 
-var filename = flag.String("config", "textsearch.cfg", "config file path name")
+type statReader struct{}
 
-var fields fieldsHashTable
+type statWriter struct{}
 
-var logger *log.Logger
-
-var reader *kafka.Reader
-var writer *kafka.Writer
-
-type stat_reader struct {
+// structure for Alarm message
+type kafkaMsg struct {
+	SrcIP       string `json:"srcip"`
+	Message     string `json:"message"`
+	Summary     string `json:"summary"`
+	Description string `json:"desc"`
+	Timestamp   string `json:"@timestamp"`
+	Type        string `json:"type"`
 }
 
-type stat_writer struct {
-}
+var (
+	kafkaURL    = flag.String("kafka-broker", "127.0.0.1:9092", "Kafka broker URL list")
+	intopic     = flag.String("kafka-in-topic", "notopic", "Kafka topic to read from")
+	outtopic    = flag.String("kafka-out-topic", "notopic", "Kafka topic to write to")
+	groupID     = flag.String("kafka-group", "nogroup", "Kafka group")
+	metricsport = flag.String("metric-port", "1234", "Port to expose metrics")
+	filename    = flag.String("config", "textsearch.cfg", "config file path name")
+	fields      fieldsHashTable
+	logger      *log.Logger
+	reader      *kafka.Reader
+	writer      *kafka.Writer
+)
 
-func (s *stat_reader) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// listener for Kafka reader metrics endpoint
+func (s *statReader) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
 	str, _ := json.Marshal(reader.Stats())
 	w.Write([]byte(str))
 }
 
-func (s *stat_writer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+//listener for Kafka writer metric endpoint
+func (s *statWriter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
 	str, _ := json.Marshal(writer.Stats())
 	w.Write([]byte(str))
 }
 
+// initialize Kafka reader
 func getKafkaReader(kafkaURL, topic, groupID string, logger *log.Logger) *kafka.Reader {
 	brokers := strings.Split(kafkaURL, ",")
 	return kafka.NewReader(kafka.ReaderConfig{
@@ -77,6 +101,7 @@ func getKafkaReader(kafkaURL, topic, groupID string, logger *log.Logger) *kafka.
 	})
 }
 
+//inintialize Kfka writer
 func newKafkaWriter(kafkaURL, topic string) *kafka.Writer {
 	return kafka.NewWriter(kafka.WriterConfig{
 		Brokers: []string{kafkaURL},
@@ -87,6 +112,7 @@ func newKafkaWriter(kafkaURL, topic string) *kafka.Writer {
 	})
 }
 
+//service function for extration from line regexp or fielname and comment
 func splitLine(line string, linenum int) ([]string, error) {
 	res := []string{"", ""}
 	str := strings.TrimSpace(line[1:])
@@ -114,6 +140,8 @@ func splitLine(line string, linenum int) ([]string, error) {
 	res[1] = str2
 	return res, nil
 }
+
+//function for extract regexps from file for f: command
 
 func loadRegexpFromFile(filename string) ([]regexp.Regexp, error) {
 
@@ -150,6 +178,7 @@ func loadRegexpFromFile(filename string) ([]regexp.Regexp, error) {
 	return res, nil
 }
 
+// Load initial config file - mapping between fields and regexps
 func loadSearches(filename string) {
 
 	file, err := os.Open(filename)
@@ -253,39 +282,23 @@ func loadSearches(filename string) {
 			}
 		}
 
-		/*str, err := regexp.Compile(scanner.Text())
-		if err != nil {
-			logger.Printf("Error compiling regexp in line %d", line)
-			line++
-			break
-		}
-		res = append(res, *str)
-		line++ */
-
 	}
 
 }
 
-type kafkaMsg struct {
-	SrcIp       string `json:"scip"`
-	Message     string `json:"message"`
-	Summary     string `json:"summary"`
-	Description string `json:"desc"`
-	Timestamp   string `json:"@timestamp"`
-	Type        string `json:"type"`
-}
+//send alarm to Kafka topic
 
-func sendAlarm(message map[string]interface{}, regexp string, comment string) {
-	logger.Print("In message: ", message, " found regexp :", regexp, " ", comment)
+func sendAlarm(message map[string]interface{}, regexp string, findings string, comment string) {
 
 	msg := new(kafkaMsg)
-
 	msg.Message = message["message"].(string)
 	msg.Type = message["type"].(string)
-	msg.SrcIp = message["srcip"].(string)
+	msg.SrcIP = message["srcip"].(string)
 	msg.Summary = comment
-	msg.Description = "Found regexp '" + regexp + "'"
+	msg.Description = "Found string " + findings + "with regexp '" + regexp + "'"
 	msg.Timestamp = time.Now().Format(time.RFC3339)
+
+	logger.Print(msg)
 
 	alrm, _ := json.Marshal(&msg)
 
@@ -339,8 +352,8 @@ func main() {
 	}()
 
 	go func() {
-		r := &stat_reader{}
-		w := &stat_writer{}
+		r := &statReader{}
+		w := &statWriter{}
 		http.Handle("/metrics/reader", r)
 		http.Handle("/metrics/writer", w)
 		logger.Fatal(http.ListenAndServe(":"+*metricsport, nil))
@@ -389,8 +402,9 @@ loop:
 				value, found := fields[k]
 				if found {
 					for i := 0; i < len((*value).regexps); i++ {
-						if (*value).regexps[i].MatchString(j.(string)) {
-							sendAlarm(msg, (*value).regexps[i].String(), (*value).comments[(*value).commentIdx[i]])
+						str := (*value).regexps[i].FindString(j.(string))
+						if len(str) > 0 {
+							sendAlarm(msg, (*value).regexps[i].String(), str, (*value).comments[(*value).commentIdx[i]])
 						}
 					}
 				}
