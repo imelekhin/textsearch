@@ -90,12 +90,12 @@ func (s *statWriter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func getKafkaReader(kafkaURL, topic, groupID string, logger *log.Logger) *kafka.Reader {
 	brokers := strings.Split(kafkaURL, ",")
 	return kafka.NewReader(kafka.ReaderConfig{
-		Brokers:  brokers,
-		GroupID:  groupID,
-		Topic:    topic,
-		MinBytes: 10e3, // 10KB
-		MaxBytes: 10e6, // 10MB
-		//StartOffset:    kafka.LastOffset,
+		Brokers:        brokers,
+		GroupID:        groupID,
+		Topic:          topic,
+		MinBytes:       10e3, // 10KB
+		MaxBytes:       10e6, // 10MB
+		StartOffset:    kafka.LastOffset,
 		CommitInterval: 1 * time.Second,
 		QueueCapacity:  10000,
 		//ReadBackoffMin: 1 * time.Millisecond,
@@ -294,16 +294,37 @@ func sendAlarm(message map[string]interface{}, regexp string, findings string, c
 
 	msg := new(kafkaMsg)
 
-	msg.Logsource = message["logsource"].(string)
-	msg.Logtype = message["class"].(string)
-	msg.Timestamp = message["@timestamp"].(string)
-	msg.ProjID = message["type"].(string)
-	msg.OrgID = message["orgid"].(string)
-	msg.Message = message["message"].(string)
+	fields := []string{"logsource", "class", "type", "orgid", "message"}
+
+	for _, f := range fields {
+
+		s, found := message[f]
+
+		if found {
+
+			switch f {
+			case "logsource":
+				msg.Logsource = s.(string)
+
+			case "class":
+				msg.Logtype = s.(string)
+
+			case "type":
+				msg.ProjID = s.(string)
+
+			case "orgid":
+				msg.OrgID = s.(string)
+
+			case "message":
+				msg.Message = s.(string)
+
+			}
+		}
+
+	}
+
 	msg.Summary = comment
 	msg.Description = "Found string " + findings + "with regexp '" + regexp + "'"
-
-	logger.Print(msg)
 
 	alrm, _ := json.Marshal(&msg)
 
