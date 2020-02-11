@@ -324,7 +324,7 @@ func sendAlarm(message map[string]interface{}, regexp string, findings string, c
 	}
 
 	msg.Summary = comment
-	msg.Description = "Found string " + findings + "with regexp '" + regexp + "'"
+	msg.Description = "Found string '" + findings + "' with regexp '" + regexp + "'"
 
 	alrm, _ := json.Marshal(&msg)
 
