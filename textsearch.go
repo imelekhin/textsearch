@@ -64,6 +64,7 @@ var (
 	groupID     = flag.String("kafka-group", "nogroup", "Kafka group")
 	metricsport = flag.String("metric-port", "1234", "Port to expose metrics")
 	filename    = flag.String("config", "textsearch.cfg", "config file path name")
+	debug       = flag.Bool("debug", false, "force debug outpoot")
 	fields      fieldsHashTable
 	logger      *log.Logger
 	reader      *kafka.Reader
@@ -225,7 +226,7 @@ func loadSearches(filename string) {
 					}
 					rgp, err := regexp.Compile(res[0])
 					if err != nil {
-						logger.Printf("Line %d : Cannot compile regexp", line)
+						logger.Printf("Line %d : Cannot compile regexp %s", line, res[0])
 						break
 					} else {
 						fields[currentfield].regexps = append(fields[currentfield].regexps, *rgp)
@@ -327,6 +328,10 @@ func sendAlarm(message map[string]interface{}, regexp string, findings string, c
 	msg.Description = "Found string '" + findings + "' with regexp '" + regexp + "'"
 
 	alrm, _ := json.Marshal(&msg)
+
+	if *debug {
+		logger.Print(string(alrm))
+	}
 
 	str := kafka.Message{
 		Key:   []byte("ti"), //[]byte(alert.BadIP)
