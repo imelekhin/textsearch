@@ -5,5 +5,5 @@ cfg file format:
 
 [field] - field name in Kafka JSON message to search for regexps. Field names are case sensetive
  r:'regexp':comment - single regular expression regexp search in field. If found send message to specified Kfka topic with "comment"
- f:'filename":comment  - find all regular expressions listed in every line in file "filename". If found send message to specified Kfka topic with "comment"
+ f:'filename":comment  - find all regular expressions listed in every line in file "filename". If found send message to specified Kafka topic with "comment"
 
