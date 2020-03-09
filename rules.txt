@@ -1,0 +1,31 @@
+
+var 
+ a = syslog
+ b = XX
+ b1 = YYY
+ c = google
+ d = mxlog
+ E = CLEAN
+endvar
+
+
+list
+  domainlist = domain.txt
+endlist 
+
+# {"logtype":"syslog","customer":"XX","message":"mxlog DIRTY a@google.com"}
+
+
+rule q1234
+    if logtype=a & customer=b &  ( message=c | message=d )
+    alarm Very bad sign 
+endrule
+
+# {"logtype":"syslog","customer":"YYY","message":"mxlog DIRTY a@google.com"}
+
+rule aaa111
+    if logtype=a & customer=b1 &  message!=domainlist
+    alarm Just another rule 
+endrule
+    
+
