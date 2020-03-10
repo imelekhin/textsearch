@@ -22,12 +22,15 @@ import (
 type variables map[string][]string
 
 type rule struct {
+	name      string
 	alarm     string
 	condition Cond
-	action    int //reserved
+	action    int           //reserved
+	execTime  time.Duration //for speed profiling
+	execCount int64
 }
 
-type rules map[string]rule
+//type rules map[string]rule
 
 var (
 	kafkaURL    = flag.String("kafka-broker", "127.0.0.1:9092", "Kafka broker URL list")
@@ -41,7 +44,8 @@ var (
 	reader      *kafka.Reader
 	writer      *kafka.Writer
 	expr        variables
-	rulelist    rules
+	rulelist    []rule
+	rulecount   int
 )
 
 func init() {
@@ -53,16 +57,17 @@ func init() {
 	flag.Parse()
 
 	expr = make(variables)
-	rulelist = make(rules)
 
 	logger.Print("Loading config from ", *filename)
 
-	err = Load(*filename, expr, rulelist)
+	err = Load(*filename, expr)
 
 	if err != nil {
 		log.Fatal(err)
 
 	}
+
+	rulecount = len(rulelist)
 
 	logger.Print("Done loading config")
 
@@ -130,10 +135,13 @@ loop:
 
 			msg := f.(map[string]interface{})
 
-			for n, r := range rulelist {
-				res, str := r.condition.Eval(msg)
+			for i := 0; i < rulecount; i++ {
+				start := time.Now()
+				res, str := rulelist[i].condition.Eval(msg)
+				rulelist[i].execCount++
+				rulelist[i].execTime += time.Since(start)
 				if res {
-					SendAlarm(msg, n, strings.Join(str, " , "), r.alarm)
+					SendAlarm(msg, rulelist[i].name, strings.Join(str, " , "), rulelist[i].alarm)
 				}
 			}
 
@@ -143,5 +151,9 @@ loop:
 	logger.Print("Terminating")
 	elapsed := time.Since(start)
 	logger.Printf("Message processed %d in %s", msgcount, elapsed)
+	logger.Println(rulecount)
+	for i := 0; i < rulecount; i++ {
+		logger.Println("Rule ", rulelist[i].name, " average exec time ", int64(rulelist[i].execTime.Microseconds())/rulelist[i].execCount, " executed ", rulelist[i].execCount)
+	}
 	//logger.Printf("Read time: %s Search time: %s Write time %s", readTime, searchTime, writeTime)
 }

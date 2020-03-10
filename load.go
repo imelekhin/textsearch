@@ -10,7 +10,7 @@ import (
 )
 
 // ToDo  - add error checks
-func Load(f string, expr variables, rulelist rules) error {
+func Load(f string, expr variables) error {
 
 	file, err := os.Open(f)
 
@@ -86,6 +86,9 @@ func Load(f string, expr variables, rulelist rules) error {
 				}
 
 				r := new(rule)
+				r.execTime = 0
+				r.execCount = 0
+				r.name = tokens[1]
 
 				for scanner.Scan() {
 					currline = strings.TrimSpace(scanner.Text())
@@ -116,7 +119,7 @@ func Load(f string, expr variables, rulelist rules) error {
 
 				}
 
-				rulelist[tokens[1]] = *r
+				rulelist = append(rulelist, *r)
 
 			}
 

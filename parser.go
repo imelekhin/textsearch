@@ -79,6 +79,7 @@ func ParseInfix(e string) (rpn Cond, err error) {
 func (rpn Cond) Eval(m map[string]interface{}) (bool, []string) {
 	var stack []bool
 	var results []string
+
 	for _, tok := range rpn {
 		switch reflect.TypeOf(tok).String() {
 		case "string":
@@ -99,6 +100,7 @@ func (rpn Cond) Eval(m map[string]interface{}) (bool, []string) {
 		}
 
 	}
+
 	return stack[0], results
 }
 
