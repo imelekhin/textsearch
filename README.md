@@ -6,6 +6,7 @@ Notes.
 3. In rule if statement  between operands, operators and brackets MUST BE SPACES
 4. For lists loaded from files used aho corasick pattern match algorithm - no regexps!
 5. Generally where is no full syntax error checks
+6. cloudflare/ahokorasick has very high memory consumption. list of ~45 000 domains consume ~5 Gb memory
 
 cfg file format:
 
