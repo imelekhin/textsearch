@@ -5,12 +5,18 @@ import (
 	"errors"
 	"log"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/cloudflare/ahocorasick"
 )
 
 // ToDo  - add error checks
-func Load(f string, expr variables) error {
+func Load(f string) (variables, []rule, error) {
+
+	expr := make(variables)
+	var rulelist []rule
 
 	file, err := os.Open(f)
 
@@ -49,7 +55,7 @@ func Load(f string, expr variables) error {
 					}
 					t := strings.Split(scanner.Text(), "=")
 					if len(t) != 2 {
-						return errors.New("Not valid variable definition at line : " + strconv.Itoa(line))
+						return nil, nil, errors.New("Not valid variable definition at line : " + strconv.Itoa(line))
 					}
 					expr[strings.TrimSpace(t[0])] = append(expr[strings.TrimSpace(t[0])], strings.TrimSpace(t[1]))
 
@@ -70,11 +76,11 @@ func Load(f string, expr variables) error {
 					}
 					t := strings.Split(scanner.Text(), "=")
 					if len(t) != 2 {
-						return errors.New("Not valid variable definition at line : " + strconv.Itoa(line))
+						return nil, nil, errors.New("Not valid variable definition at line : " + strconv.Itoa(line))
 					}
-					expr[strings.TrimSpace(t[0])], err = loadRegexpFromFile(strings.TrimSpace(t[1]))
+					expr[strings.TrimSpace(t[0])], err = loadPatternsFromFile(strings.TrimSpace(t[1]))
 					if err != nil {
-						return err
+						return nil, nil, err
 					}
 
 				}
@@ -82,7 +88,7 @@ func Load(f string, expr variables) error {
 			case "rule":
 				line++
 				if len(tokens) < 2 {
-					return errors.New("Not valid rule name : " + strconv.Itoa(line))
+					return nil, nil, errors.New("Not valid rule name : " + strconv.Itoa(line))
 				}
 
 				r := new(rule)
@@ -107,14 +113,19 @@ func Load(f string, expr variables) error {
 
 					switch ruletokens[0] {
 					case "if":
-						r.condition, err = ParseInfix(strings.TrimSpace(ruletokens[1]))
+						r.condition, err = ParseInfix(strings.TrimSpace(ruletokens[1]), expr)
 						if err != nil {
-							return err
+							return nil, nil, err
 						}
 					case "alarm":
 						r.alarm = strings.TrimSpace(ruletokens[1])
+					/*case "filter":
+					r.filter, err = regexp.Compile(strings.TrimSpace(ruletokens[1]))
+					if err != nil {
+						return err
+					} */
 					default:
-						return errors.New("Not valid comand inside rule : " + strconv.Itoa(line))
+						return nil, nil, errors.New("Not valid comand inside rule : " + strconv.Itoa(line))
 					}
 
 				}
@@ -127,14 +138,43 @@ func Load(f string, expr variables) error {
 
 	}
 
-	return nil
+	return expr, rulelist, nil
 
 }
 
-func loadRegexpFromFile(filename string) ([]string, error) {
+func Compile(varlist variables) (variables1, error) {
+	res := make(variables1)
 
-	var res []string
+	for name, value := range varlist {
+		vc := new(variablecompiled)
+
+		switch len(value) {
+		case 0:
+			break
+		case 1:
+			r, err := regexp.Compile(value[0])
+			if err != nil {
+				return nil, err
+			}
+
+			vc.v = r
+			res[name] = *vc
+
+		default:
+			m := ahocorasick.NewStringMatcher(value)
+			vc.v = m
+			vc.name = name
+			res[name] = *vc
+		}
+
+	}
+	return res, nil
+}
+
+func loadPatternsFromFile(filename string) ([]string, error) {
 	file, err := os.Open(filename)
+
+	var patterns []string
 
 	defer file.Close()
 
@@ -151,10 +191,11 @@ func loadRegexpFromFile(filename string) ([]string, error) {
 	for scanner.Scan() {
 		str := strings.TrimSpace(scanner.Text())
 		if len(str) >= 1 {
-			res = append(res, str)
+			patterns = append(patterns, str)
 		}
 
 	}
 
-	return res, nil
+	return patterns, nil
+
 }

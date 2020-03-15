@@ -19,33 +19,23 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-type variables map[string][]string
-
-type rule struct {
-	name      string
-	alarm     string
-	condition Cond
-	action    int           //reserved
-	execTime  time.Duration //for speed profiling
-	execCount int64
-}
-
 //type rules map[string]rule
 
 var (
-	kafkaURL    = flag.String("kafka-broker", "127.0.0.1:9092", "Kafka broker URL list")
-	intopic     = flag.String("kafka-in-topic", "notopic", "Kafka topic to read from")
-	outtopic    = flag.String("kafka-out-topic", "notopic", "Kafka topic to write to")
-	groupID     = flag.String("kafka-group", "nogroup", "Kafka group")
-	metricsport = flag.String("metric-port", "1234", "Port to expose metrics")
-	filename    = flag.String("config", "textsearch.cfg", "config file path name")
-	debug       = flag.Bool("debug", false, "force debug outpoot")
-	logger      *log.Logger
-	reader      *kafka.Reader
-	writer      *kafka.Writer
-	expr        variables
-	rulelist    []rule
-	rulecount   int
+	kafkaURL     = flag.String("kafka-broker", "127.0.0.1:9092", "Kafka broker URL list")
+	intopic      = flag.String("kafka-in-topic", "notopic", "Kafka topic to read from")
+	outtopic     = flag.String("kafka-out-topic", "notopic", "Kafka topic to write to")
+	groupID      = flag.String("kafka-group", "nogroup", "Kafka group")
+	metricsport  = flag.String("metric-port", "1234", "Port to expose metrics")
+	filename     = flag.String("config", "textsearch.cfg", "config file path name")
+	debug        = flag.Bool("debug", false, "force debug outpoot")
+	logger       *log.Logger
+	reader       *kafka.Reader
+	writer       *kafka.Writer
+	expr         variables
+	varscompiled variables1
+	rules        []rule
+	rulecount    int
 )
 
 func init() {
@@ -56,18 +46,27 @@ func init() {
 
 	flag.Parse()
 
-	expr = make(variables)
-
 	logger.Print("Loading config from ", *filename)
 
-	err = Load(*filename, expr)
+	expr, rules, err = Load(*filename)
 
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 
 	}
 
-	rulecount = len(rulelist)
+	logger.Print("Load config file completed")
+	logger.Print("Start compiling ")
+
+	varscompiled, err = Compile(expr)
+
+	logger.Print("Compile completed")
+
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	rulecount = len(rules)
 
 	logger.Print("Done loading config")
 
@@ -135,14 +134,15 @@ loop:
 
 			msg := f.(map[string]interface{})
 
-			for i := 0; i < rulecount; i++ {
+			for i := 0; i < len(rules); i++ {
 				start := time.Now()
-				res, str := rulelist[i].condition.Eval(msg)
-				rulelist[i].execCount++
-				rulelist[i].execTime += time.Since(start)
+				res, str := rules[i].condition.Eval(msg)
+				rules[i].execCount++
+				rules[i].execTime += time.Since(start)
 				if res {
-					SendAlarm(msg, rulelist[i].name, strings.Join(str, " , "), rulelist[i].alarm)
+					SendAlarm(msg, rules[i].name, strings.Join(str, " , "), rules[i].alarm)
 				}
+
 			}
 
 		}
@@ -153,7 +153,7 @@ loop:
 	logger.Printf("Message processed %d in %s", msgcount, elapsed)
 	logger.Println(rulecount)
 	for i := 0; i < rulecount; i++ {
-		logger.Println("Rule ", rulelist[i].name, " average exec time ", int64(rulelist[i].execTime.Microseconds())/rulelist[i].execCount, " executed ", rulelist[i].execCount)
+		logger.Println("Rule ", rules[i].name, " average exec time ", int64(rules[i].execTime.Microseconds())/rules[i].execCount)
 	}
 	//logger.Printf("Read time: %s Search time: %s Write time %s", readTime, searchTime, writeTime)
 }
