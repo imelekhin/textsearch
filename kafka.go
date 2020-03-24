@@ -117,6 +117,7 @@ func SendAlarm(message map[string]interface{}, regexp string, findings string, c
 
 	if *debug {
 		logger.Print(string(alrm))
+		return
 	}
 
 	str := kafka.Message{
