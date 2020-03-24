@@ -1,8 +1,15 @@
-package main
+/*
+Copyright (c) 2020, Ivan V. Melekhin
+IZ:SOC
+https://www.izsoc.ru
+All rights reserved.
 
-/*  Search for regexp patterns in Kafka stream. Kafka messages must be in JSON.
+Search for regexp patterns in Kafka stream. Kafka messages must be in JSON.
 If regexp found write alarm to Kafka topic.
+
 */
+
+package main
 
 import (
 	"context"
